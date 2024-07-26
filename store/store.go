@@ -25,6 +25,8 @@ type MysqlStore struct {
 	*AddressStatStore
 	*MinerStore
 	*MinerStatStore
+	*DASignerStore
+	*DASubmitStore
 }
 
 func MustNewStore(db *gorm.DB) *MysqlStore {
@@ -41,13 +43,24 @@ func MustNewStore(db *gorm.DB) *MysqlStore {
 		AddressStatStore:   newAddressStatStore(db),
 		MinerStore:         newMinerStore(db),
 		MinerStatStore:     newMinerStatStore(db),
+		DASignerStore:      newDASignerStore(db),
+		DASubmitStore:      newDASubmitStore(db),
 	}
 }
 
-func (ms *MysqlStore) Push(block *Block, submits []*Submit, rewards []*Reward) error {
+type DecodedLogs struct {
+	Submits                    []Submit
+	Rewards                    []Reward
+	DASigners                  []DASigner
+	DASignersWithSocketUpdated []DASigner
+	DASubmits                  []DASubmit
+	DASubmitsWithVerified      []DASubmit
+}
+
+func (ms *MysqlStore) Push(block *Block, decodedLogs *DecodedLogs) error {
 	addressSubmits := make([]AddressSubmit, 0)
-	if len(submits) > 0 {
-		for _, submit := range submits {
+	if len(decodedLogs.Submits) > 0 {
+		for _, submit := range decodedLogs.Submits {
 			addressSubmit := AddressSubmit{
 				SenderID:        submit.SenderID,
 				SubmissionIndex: submit.SubmissionIndex,
@@ -64,8 +77,8 @@ func (ms *MysqlStore) Push(block *Block, submits []*Submit, rewards []*Reward) e
 	}
 
 	addressRewards := make([]AddressReward, 0)
-	if len(rewards) > 0 {
-		for _, reward := range rewards {
+	if len(decodedLogs.Rewards) > 0 {
+		for _, reward := range decodedLogs.Rewards {
 			addressReward := AddressReward{
 				MinerID:      reward.MinerID,
 				PricingIndex: reward.PricingIndex,
@@ -85,8 +98,8 @@ func (ms *MysqlStore) Push(block *Block, submits []*Submit, rewards []*Reward) e
 		}
 
 		// save flow submits
-		if len(submits) > 0 {
-			if err := ms.SubmitStore.Add(dbTx, submits); err != nil {
+		if len(decodedLogs.Submits) > 0 {
+			if err := ms.SubmitStore.Add(dbTx, decodedLogs.Submits); err != nil {
 				return errors.WithMessage(err, "failed to save flow submits")
 			}
 			if err := ms.AddressSubmitStore.Add(dbTx, addressSubmits); err != nil {
@@ -95,12 +108,44 @@ func (ms *MysqlStore) Push(block *Block, submits []*Submit, rewards []*Reward) e
 		}
 
 		// save distribute rewards
-		if len(rewards) > 0 {
-			if err := ms.RewardStore.Add(dbTx, rewards); err != nil {
+		if len(decodedLogs.Rewards) > 0 {
+			if err := ms.RewardStore.Add(dbTx, decodedLogs.Rewards); err != nil {
 				return errors.WithMessage(err, "failed to save rewards")
 			}
 			if err := ms.AddressRewardStore.Add(dbTx, addressRewards); err != nil {
 				return errors.WithMessage(err, "failed to save address rewards")
+			}
+		}
+
+		// save DA signers
+		if len(decodedLogs.DASigners) > 0 {
+			if err := ms.DASignerStore.Add(dbTx, decodedLogs.DASigners); err != nil {
+				return errors.WithMessage(err, "failed to save DA signers")
+			}
+		}
+
+		// save DA submits
+		if len(decodedLogs.DASubmits) > 0 {
+			if err := ms.DASubmitStore.Add(dbTx, decodedLogs.DASubmits); err != nil {
+				return errors.WithMessage(err, "failed to save DA submits")
+			}
+		}
+
+		// update DA signers
+		if len(decodedLogs.DASignersWithSocketUpdated) > 0 {
+			for _, signer := range decodedLogs.DASignersWithSocketUpdated {
+				if err := ms.DASignerStore.UpdateByPrimaryKey(dbTx, signer); err != nil {
+					return errors.WithMessage(err, "failed to update socket for DA signer")
+				}
+			}
+		}
+
+		// update DA submits
+		if len(decodedLogs.DASubmitsWithVerified) > 0 {
+			for _, submit := range decodedLogs.DASubmitsWithVerified {
+				if err := ms.DASubmitStore.UpdateByPrimaryKey(dbTx, submit); err != nil {
+					return errors.WithMessage(err, "failed to update verified status for DA signer")
+				}
 			}
 		}
 
