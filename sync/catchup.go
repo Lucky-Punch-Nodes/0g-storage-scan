@@ -2,6 +2,7 @@ package sync
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"time"
 
@@ -68,6 +69,10 @@ func MustNewCatchupSyncer(sdk *web3go.Client, db *store.MysqlStore, conf SyncCon
 		SocketUpdatedSignature string
 	}
 	viperUtil.MustUnmarshalKey("daSigners", &daSigners)
+	logrus.WithFields(logrus.Fields{
+		"NewSignerSignature":     daSigners.NewSignerSignature,
+		"SocketUpdatedSignature": daSigners.SocketUpdatedSignature,
+	}).Info("debug catchup ---1---")
 
 	return &CatchupSyncer{
 		conf: &conf,
@@ -135,6 +140,12 @@ func (s *CatchupSyncer) syncRange(ctx context.Context, rangeStart, rangeEnd uint
 		if err != nil {
 			return err
 		}
+		logsJson, _ := json.Marshal(logs)
+		logrus.WithFields(logrus.Fields{
+			"start": start,
+			"end":   end,
+			"logs":  string(logsJson),
+		}).Info("debug catchup ---2---")
 
 		var bn2TimeMap map[uint64]uint64
 		if len(logs) > 0 {

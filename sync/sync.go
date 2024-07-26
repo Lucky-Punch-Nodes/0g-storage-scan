@@ -2,6 +2,7 @@ package sync
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"sync"
 	"time"
@@ -76,6 +77,10 @@ func MustNewSyncer(sdk *web3go.Client, db *store.MysqlStore, cf SyncConfig, cs *
 		SocketUpdatedSignature string
 	}
 	viperUtil.MustUnmarshalKey("daSigners", &daSigners)
+	logrus.WithFields(logrus.Fields{
+		"NewSignerSignature":     daSigners.NewSignerSignature,
+		"SocketUpdatedSignature": daSigners.SocketUpdatedSignature,
+	}).Info("debug sync ---1---")
 
 	syncer := &Syncer{
 		conf:                &cf,
@@ -258,6 +263,11 @@ func (s *Syncer) syncOnce(ctx context.Context) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	logsJson, _ := json.Marshal(decodedLogs)
+	logrus.WithFields(logrus.Fields{
+		"block": curBlock,
+		"logs":  string(logsJson),
+	}).Info("debug sync ---2---")
 	if err = s.db.Push(block, decodedLogs); err != nil {
 		return false, err
 	}
