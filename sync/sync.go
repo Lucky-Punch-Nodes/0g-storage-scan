@@ -2,7 +2,6 @@ package sync
 
 import (
 	"context"
-	"encoding/json"
 	"strings"
 	"sync"
 	"time"
@@ -263,11 +262,11 @@ func (s *Syncer) syncOnce(ctx context.Context) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	logsJson, _ := json.Marshal(decodedLogs)
+	/*logsJson, _ := json.Marshal(decodedLogs)
 	logrus.WithFields(logrus.Fields{
 		"block": curBlock,
 		"logs":  string(logsJson),
-	}).Info("debug sync ---2---")
+	}).Info("debug sync ---2---")*/
 	if err = s.db.Push(block, decodedLogs); err != nil {
 		return false, err
 	}

@@ -2,7 +2,6 @@ package sync
 
 import (
 	"context"
-	"encoding/json"
 	"strings"
 	"time"
 
@@ -140,12 +139,12 @@ func (s *CatchupSyncer) syncRange(ctx context.Context, rangeStart, rangeEnd uint
 		if err != nil {
 			return err
 		}
-		logsJson, _ := json.Marshal(logs)
+		/*logsJson, _ := json.Marshal(logs)
 		logrus.WithFields(logrus.Fields{
 			"start": start,
 			"end":   end,
 			"logs":  string(logsJson),
-		}).Info("debug catchup ---2---")
+		}).Info("debug catchup ---2---")*/
 
 		var bn2TimeMap map[uint64]uint64
 		if len(logs) > 0 {
